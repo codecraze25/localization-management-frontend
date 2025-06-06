@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Plus, Edit3, Save, X } from 'lucide-react';
+import { Search, Filter, Plus, Edit3, Save, X, AlertCircle } from 'lucide-react';
 import { useTranslationKeys, useUpdateTranslation } from '@/hooks/useApi';
 import {
   useCurrentProject,
@@ -9,7 +9,7 @@ import {
   useFilters,
   useLocalizationActions
 } from '@/store/useLocalizationStore';
-import type { TranslationKey, TranslationKeyFilters } from '@/types';
+import type { TranslationKey, TranslationKeyFilters, Language } from '@/types';
 
 interface TranslationKeyManagerProps {
   projectId?: string;
@@ -52,12 +52,32 @@ export default function TranslationKeyManager({
   // Get available languages from current project
   const availableLanguages = currentProject?.languages || [];
 
+  // Organize languages to prioritize the selected one
+  const organizedLanguages = useMemo(() => {
+    if (!currentLanguage) return availableLanguages;
+
+    const selectedLang = availableLanguages.find(lang => lang.code === currentLanguage.code);
+    const otherLangs = availableLanguages.filter(lang => lang.code !== currentLanguage.code);
+
+    return selectedLang ? [selectedLang, ...otherLangs] : availableLanguages;
+  }, [availableLanguages, currentLanguage]);
+
   // Get unique categories from translation keys
   const availableCategories = useMemo(() => {
     if (!translationData?.keys) return [];
     const categories = new Set(translationData.keys.map(key => key.category));
     return Array.from(categories).sort();
   }, [translationData]);
+
+  // Sync language filter with sidebar selection
+  useEffect(() => {
+    if (currentLanguage && filters.languageCode !== currentLanguage.code) {
+      // Only auto-sync if no specific language filter is set
+      if (!filters.languageCode) {
+        setFilters({ languageCode: currentLanguage.code });
+      }
+    }
+  }, [currentLanguage, filters.languageCode, setFilters]);
 
   // Debounced search effect
   useEffect(() => {
@@ -99,6 +119,13 @@ export default function TranslationKeyManager({
     setFilters(filterUpdate);
   };
 
+  // Helper function to check if a translation is missing for the current language
+  const isMissingCurrentLanguage = (translationKey: TranslationKey) => {
+    if (!currentLanguage) return false;
+    const translation = translationKey.translations[currentLanguage.code];
+    return !translation || !translation.value || translation.value.trim() === '';
+  };
+
   if (!activeProjectId) {
     return (
       <div className="flex items-center justify-center h-64 text-stone-500 dark:text-stone-400">
@@ -132,6 +159,11 @@ export default function TranslationKeyManager({
           <p className="text-stone-600 dark:text-stone-400 mt-1">
             {translationData?.total || 0} keys found
             {currentProject && ` in ${currentProject.name}`}
+            {currentLanguage && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                {currentLanguage.flag} {currentLanguage.name}
+              </span>
+            )}
           </p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -140,9 +172,37 @@ export default function TranslationKeyManager({
         </button>
       </div>
 
+      {/* Current Language Focus Banner */}
+      {currentLanguage && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{currentLanguage.flag}</span>
+                <div>
+                  <h3 className="font-medium text-blue-900 dark:text-blue-100">
+                    Focusing on {currentLanguage.name}
+                  </h3>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    The table is optimized for {currentLanguage.name} translations
+                  </p>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => handleFilterChange({ missingTranslations: true, languageCode: currentLanguage.code })}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
+              <AlertCircle size={14} />
+              Show Missing Only
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search and Filters */}
       <div className="bg-white dark:bg-stone-800 rounded-lg p-4 shadow-sm border border-stone-200 dark:border-stone-700">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400" size={16} />
@@ -164,20 +224,6 @@ export default function TranslationKeyManager({
             <option value="">All Categories</option>
             {availableCategories.map(category => (
               <option key={category} value={category}>{category}</option>
-            ))}
-          </select>
-
-          {/* Language Filter */}
-          <select
-            value={filters.languageCode || ''}
-            onChange={(e) => handleFilterChange({ languageCode: e.target.value || undefined })}
-            className="px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100"
-          >
-            <option value="">All Languages</option>
-            {availableLanguages.map(language => (
-              <option key={language.code} value={language.code}>
-                {language.flag} {language.name}
-              </option>
             ))}
           </select>
 
@@ -213,96 +259,136 @@ export default function TranslationKeyManager({
                   <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
                     Category
                   </th>
-                  {availableLanguages.map(language => (
-                    <th key={language.code} className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
-                      {language.flag} {language.name}
-                    </th>
-                  ))}
+                  {organizedLanguages.map((language, index) => {
+                    const isCurrentLanguage = currentLanguage?.code === language.code;
+                    return (
+                      <th
+                        key={language.code}
+                        className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isCurrentLanguage
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-l-2 border-r-2 border-blue-400'
+                          : 'text-stone-500 dark:text-stone-300'
+                          }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {language.flag} {language.name}
+                          {isCurrentLanguage && (
+                            <span className="px-1.5 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs font-bold">
+                              CURRENT
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
-                {translationData?.keys.map((translationKey) => (
-                  <tr key={translationKey.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
-                          {translationKey.key}
-                        </div>
-                        {translationKey.description && (
-                          <div className="text-sm text-stone-500 dark:text-stone-400">
-                            {translationKey.description}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-800 dark:bg-stone-600 dark:text-stone-200">
-                        {translationKey.category}
-                      </span>
-                    </td>
-                    {availableLanguages.map(language => {
-                      const translation = translationKey.translations[language.code];
-                      const isEditing = editingCell?.keyId === translationKey.id &&
-                        editingCell?.languageCode === language.code;
+                {translationData?.keys.map((translationKey) => {
+                  const missingCurrentLang = isMissingCurrentLanguage(translationKey);
 
-                      return (
-                        <td key={language.code} className="px-6 py-4">
-                          {isEditing ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={editingCell.value}
-                                onChange={(e) => setEditingCell({
-                                  ...editingCell,
-                                  value: e.target.value
-                                })}
-                                className="flex-1 px-2 py-1 text-sm border border-stone-300 dark:border-stone-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleEditSave();
-                                  if (e.key === 'Escape') handleEditCancel();
-                                }}
-                              />
-                              <button
-                                onClick={handleEditSave}
-                                disabled={updateTranslationMutation.isPending}
-                                className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
-                              >
-                                <Save size={14} />
-                              </button>
-                              <button
-                                onClick={handleEditCancel}
-                                className="p-1 text-red-600 hover:text-red-700"
-                              >
-                                <X size={14} />
-                              </button>
+                  return (
+                    <tr
+                      key={translationKey.id}
+                      className={`hover:bg-stone-50 dark:hover:bg-stone-700/50 ${missingCurrentLang ? 'bg-red-50 dark:bg-red-900/10' : ''
+                        }`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
+                              {translationKey.key}
                             </div>
-                          ) : (
-                            <div
-                              className="group flex items-center gap-2 cursor-pointer"
-                              onClick={() => handleEditStart(
-                                translationKey.id,
-                                language.code,
-                                translation?.value || ''
-                              )}
-                            >
-                              {translation ? (
-                                <span className="text-sm text-stone-900 dark:text-stone-100 flex-1">
-                                  {translation.value}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-stone-400 italic flex-1">
-                                  Missing translation
-                                </span>
-                              )}
-                              <Edit3 size={14} className="opacity-0 group-hover:opacity-100 text-stone-400" />
-                            </div>
+                            {translationKey.description && (
+                              <div className="text-sm text-stone-500 dark:text-stone-400">
+                                {translationKey.description}
+                              </div>
+                            )}
+                          </div>
+                          {missingCurrentLang && (
+                            <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
                           )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-800 dark:bg-stone-600 dark:text-stone-200">
+                          {translationKey.category}
+                        </span>
+                      </td>
+                      {organizedLanguages.map((language) => {
+                        const translation = translationKey.translations[language.code];
+                        const isEditing = editingCell?.keyId === translationKey.id &&
+                          editingCell?.languageCode === language.code;
+                        const isCurrentLanguage = currentLanguage?.code === language.code;
+                        const isMissing = !translation || !translation.value || translation.value.trim() === '';
+
+                        return (
+                          <td
+                            key={language.code}
+                            className={`px-6 py-4 ${isCurrentLanguage
+                              ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-r-2 border-blue-400'
+                              : ''
+                              }`}
+                          >
+                            {isEditing ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={editingCell.value}
+                                  onChange={(e) => setEditingCell({
+                                    ...editingCell,
+                                    value: e.target.value
+                                  })}
+                                  className="flex-1 px-2 py-1 text-sm border border-stone-300 dark:border-stone-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleEditSave();
+                                    if (e.key === 'Escape') handleEditCancel();
+                                  }}
+                                />
+                                <button
+                                  onClick={handleEditSave}
+                                  disabled={updateTranslationMutation.isPending}
+                                  className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={handleEditCancel}
+                                  className="p-1 text-red-600 hover:text-red-700"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                className="group flex items-center gap-2 cursor-pointer"
+                                onClick={() => handleEditStart(
+                                  translationKey.id,
+                                  language.code,
+                                  translation?.value || ''
+                                )}
+                              >
+                                {translation && translation.value ? (
+                                  <span className="text-sm text-stone-900 dark:text-stone-100 flex-1">
+                                    {translation.value}
+                                  </span>
+                                ) : (
+                                  <span className={`text-sm italic flex-1 ${isCurrentLanguage && isMissing
+                                    ? 'text-red-500 font-medium'
+                                    : 'text-stone-400'
+                                    }`}>
+                                    Missing translation
+                                  </span>
+                                )}
+                                <Edit3 size={14} className="opacity-0 group-hover:opacity-100 text-stone-400" />
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
