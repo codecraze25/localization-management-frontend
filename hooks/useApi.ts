@@ -71,9 +71,9 @@ export const useCreateTranslationKey = () => {
     mutationFn: (data: CreateTranslationKeyRequest) =>
       apiClient.createTranslationKey(data),
     onSuccess: (newKey, variables) => {
-      // Invalidate and refetch translation keys for the project
+      // Invalidate all translation keys queries to ensure the new key appears
       queryClient.invalidateQueries({
-        queryKey: queryKeys.translationKeys(variables.projectId),
+        queryKey: ['translation-keys'],
       });
 
       // Add to local store
@@ -99,22 +99,71 @@ export const useUpdateTranslation = () => {
       languageCode: string;
       value: string;
     }) => apiClient.updateTranslation(keyId, languageCode, { value }),
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['translation-keys'] });
+
+      // Snapshot the previous value for rollback
+      const previousData = queryClient.getQueriesData({
+        queryKey: ['translation-keys'],
+      });
+
+      // Optimistically update the cache
+      queryClient.setQueriesData(
+        { queryKey: ['translation-keys'] },
+        (old: any) => {
+          if (!old?.keys) return old;
+
+          return {
+            ...old,
+            keys: old.keys.map((key: any) => {
+              if (key.id === variables.keyId) {
+                return {
+                  ...key,
+                  translations: {
+                    ...key.translations,
+                    [variables.languageCode]: {
+                      value: variables.value,
+                      updatedAt: new Date().toISOString(),
+                      updatedBy: 'user',
+                    },
+                  },
+                };
+              }
+              return key;
+            }),
+          };
+        }
+      );
+
+      // Return context for rollback
+      return { previousData };
+    },
     onSuccess: (_, variables) => {
-      // Update local store optimistically
+      // Update local store
       updateTranslation(
         variables.keyId,
         variables.languageCode,
         variables.value
       );
 
-      // Invalidate related queries
+      // Invalidate all translation-related queries to ensure consistency
+      queryClient.invalidateQueries({
+        queryKey: ['translation-keys'],
+      });
       queryClient.invalidateQueries({
         queryKey: queryKeys.translationKey(variables.keyId),
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables, context) => {
+      // Rollback optimistic updates on error
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+
       setError(error.message);
-      // Could implement rollback logic here
     },
   });
 };
