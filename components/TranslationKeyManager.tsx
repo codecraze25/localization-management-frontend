@@ -47,6 +47,13 @@ export default function TranslationKeyManager({
     missingTranslations: filters.missingTranslations,
   });
 
+  // Separate query for getting all categories (unfiltered)
+  const {
+    data: allTranslationData,
+  } = useTranslationKeys(activeProjectId || '', {
+    // No filters to get all categories
+  });
+
   const updateTranslationMutation = useUpdateTranslation();
 
   // Get available languages from current project
@@ -62,12 +69,12 @@ export default function TranslationKeyManager({
     return selectedLang ? [selectedLang, ...otherLangs] : availableLanguages;
   }, [availableLanguages, currentLanguage]);
 
-  // Get unique categories from translation keys
+  // Get unique categories from unfiltered translation keys
   const availableCategories = useMemo(() => {
-    if (!translationData?.keys) return [];
-    const categories = new Set(translationData.keys.map(key => key.category));
+    if (!allTranslationData?.keys) return [];
+    const categories = new Set(allTranslationData.keys.map(key => key.category));
     return Array.from(categories).sort();
-  }, [translationData]);
+  }, [allTranslationData]);
 
   // Sync language filter with sidebar selection
   useEffect(() => {
