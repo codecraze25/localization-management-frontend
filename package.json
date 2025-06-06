@@ -23,10 +23,12 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@swc/jest": "^0.2.37",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -36,18 +38,5 @@
     "jest-environment-jsdom": "^29.7.0",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "jest": {
-    "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": [
-      "<rootDir>/jest.setup.js"
-    ],
-    "moduleNameMapping": {
-      "^@/(.*)$": "<rootDir>/$1"
-    },
-    "testPathIgnorePatterns": [
-      "<rootDir>/.next/",
-      "<rootDir>/node_modules/"
-    ]
   }
 }
