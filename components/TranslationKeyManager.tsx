@@ -290,9 +290,6 @@ export default function TranslationKeyManager({
                   <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
-                    Actions
-                  </th>
                   {organizedLanguages.map((language, index) => {
                     const isCurrentLanguage = currentLanguage?.code === language.code;
                     return (
@@ -314,6 +311,9 @@ export default function TranslationKeyManager({
                       </th>
                     );
                   })}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
@@ -348,15 +348,6 @@ export default function TranslationKeyManager({
                           {translationKey.category}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleDeleteClick(translationKey)}
-                          className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          title={`Delete ${translationKey.key}`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
                       {organizedLanguages.map((language) => {
                         const translation = translationKey.translations[language.code];
                         const isEditing = editingCell?.keyId === translationKey.id &&
@@ -373,7 +364,12 @@ export default function TranslationKeyManager({
                               }`}
                           >
                             {isEditing ? (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 relative">
+                                {updateTranslationMutation.isPending && (
+                                  <div className="absolute inset-0 bg-white/50 dark:bg-stone-800/50 rounded flex items-center justify-center z-10">
+                                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                  </div>
+                                )}
                                 <input
                                   type="text"
                                   value={editingCell.value}
@@ -381,7 +377,8 @@ export default function TranslationKeyManager({
                                     ...editingCell,
                                     value: e.target.value
                                   })}
-                                  className="flex-1 px-2 py-1 text-sm border border-stone-300 dark:border-stone-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100"
+                                  disabled={updateTranslationMutation.isPending}
+                                  className="flex-1 px-2 py-1 text-sm border border-stone-300 dark:border-stone-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                   autoFocus
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') handleEditSave();
@@ -393,11 +390,16 @@ export default function TranslationKeyManager({
                                   disabled={updateTranslationMutation.isPending}
                                   className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
                                 >
-                                  <Save size={14} />
+                                  {updateTranslationMutation.isPending ? (
+                                    <div className="w-3.5 h-3.5 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <Save size={14} />
+                                  )}
                                 </button>
                                 <button
                                   onClick={handleEditCancel}
-                                  className="p-1 text-red-600 hover:text-red-700"
+                                  disabled={updateTranslationMutation.isPending}
+                                  className="p-1 text-red-600 hover:text-red-700 disabled:opacity-50"
                                 >
                                   <X size={14} />
                                 </button>
@@ -429,6 +431,15 @@ export default function TranslationKeyManager({
                           </td>
                         );
                       })}
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => handleDeleteClick(translationKey)}
+                          className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title={`Delete ${translationKey.key}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
