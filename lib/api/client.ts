@@ -1,8 +1,6 @@
 import type {
   GetTranslationKeysParams,
   CreateTranslationKeyRequest,
-  UpdateTranslationRequest,
-  ApiResponse,
 } from './types';
 import type {
   TranslationKey,
@@ -69,44 +67,56 @@ class AuthTokenManager {
 }
 
 // Data transformation utilities
-const transformTranslation = (apiTranslation: any): Translation => ({
-  value: apiTranslation.value || '',
-  updatedAt: apiTranslation.updated_at || new Date().toISOString(),
-  updatedBy: apiTranslation.updated_by || 'unknown',
+const transformTranslation = (
+  apiTranslation: Record<string, unknown>
+): Translation => ({
+  value: (apiTranslation.value as string) || '',
+  updatedAt: (apiTranslation.updated_at as string) || new Date().toISOString(),
+  updatedBy: (apiTranslation.updated_by as string) || 'unknown',
 });
 
-const transformTranslationKey = (apiKey: any): TranslationKey => {
+const transformTranslationKey = (
+  apiKey: Record<string, unknown>
+): TranslationKey => {
   const translations: { [languageCode: string]: Translation } = {};
 
-  if (apiKey.translations) {
+  if (apiKey.translations && typeof apiKey.translations === 'object') {
     for (const [langCode, trans] of Object.entries(apiKey.translations)) {
-      translations[langCode] = transformTranslation(trans);
+      if (trans && typeof trans === 'object') {
+        translations[langCode] = transformTranslation(
+          trans as Record<string, unknown>
+        );
+      }
     }
   }
 
   return {
-    id: apiKey.id,
-    key: apiKey.key,
-    category: apiKey.category,
-    description: apiKey.description,
+    id: apiKey.id as string,
+    key: apiKey.key as string,
+    category: apiKey.category as string,
+    description: apiKey.description as string | undefined,
     translations,
   };
 };
 
 const transformGetTranslationKeysResponse = (
-  apiResponse: any
+  apiResponse: Record<string, unknown>
 ): GetTranslationKeysResponse => ({
-  keys: apiResponse.keys.map(transformTranslationKey),
-  total: apiResponse.total,
-  page: apiResponse.page,
-  limit: apiResponse.limit,
+  keys: Array.isArray(apiResponse.keys)
+    ? apiResponse.keys.map((key) =>
+        transformTranslationKey(key as Record<string, unknown>)
+      )
+    : [],
+  total: (apiResponse.total as number) || 0,
+  page: (apiResponse.page as number) || 1,
+  limit: (apiResponse.limit as number) || 20,
 });
 
 // Enhanced API Error class
 class ApiError extends Error {
   code: string;
   status: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   isAuthError: boolean;
 
   constructor({
@@ -118,7 +128,7 @@ class ApiError extends Error {
     message: string;
     code: string;
     status: number;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
   }) {
     super(message);
     this.name = 'ApiError';
@@ -172,7 +182,10 @@ class ApiClient {
       const response = await fetch(url, config);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = (await response.json().catch(() => ({}))) as Record<
+          string,
+          unknown
+        >;
 
         // Handle auth errors specifically
         if (response.status === 401) {
@@ -187,7 +200,7 @@ class ApiClient {
 
         throw new ApiError({
           message:
-            errorData.detail ||
+            (errorData.detail as string) ||
             `HTTP ${response.status}: ${response.statusText}`,
           code: 'HTTP_ERROR',
           status: response.status,
@@ -201,9 +214,10 @@ class ApiClient {
         throw error;
       }
 
+      // Handle network errors
       throw new ApiError({
         message:
-          error instanceof Error ? error.message : 'Unknown error occurred',
+          error instanceof Error ? error.message : 'Network error occurred',
         code: 'NETWORK_ERROR',
         status: 0,
       });
@@ -239,19 +253,21 @@ class ApiClient {
       query ? `?${query}` : ''
     }`;
 
-    const apiResponse = await this.request<any>(endpoint);
+    const apiResponse = await this.request<Record<string, unknown>>(endpoint);
     return transformGetTranslationKeysResponse(apiResponse);
   }
 
   async getTranslationKey(keyId: string): Promise<TranslationKey> {
-    const apiResponse = await this.request<any>(`/translation-keys/${keyId}`);
+    const apiResponse = await this.request<Record<string, unknown>>(
+      `/translation-keys/${keyId}`
+    );
     return transformTranslationKey(apiResponse);
   }
 
   async createTranslationKey(
     data: CreateTranslationKeyRequest
   ): Promise<TranslationKey> {
-    const apiResponse = await this.request<any>(
+    const apiResponse = await this.request<Record<string, unknown>>(
       '/translation-keys',
       {
         method: 'POST',

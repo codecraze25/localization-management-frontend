@@ -11,7 +11,7 @@ import {
   useLocalizationActions
 } from '@/store/useLocalizationStore';
 import { formatErrorMessage } from '@/lib/utils/errorFormatter';
-import type { TranslationKey, TranslationKeyFilters, Language } from '@/types';
+import type { TranslationKey, TranslationKeyFilters } from '@/types';
 import AddTranslationKeyModal from './AddTranslationKeyModal';
 import DeleteTranslationKeyModal from './DeleteTranslationKeyModal';
 
@@ -75,7 +75,9 @@ export default function TranslationKeyManager({
   const updateTranslationMutation = useUpdateTranslation();
 
   // Get available languages from current project
-  const availableLanguages = currentProject?.languages || [];
+  const availableLanguages = useMemo(() => {
+    return currentProject?.languages || [];
+  }, [currentProject?.languages]);
 
   // Organize languages to prioritize the selected one
   const organizedLanguages = useMemo(() => {
@@ -298,7 +300,7 @@ export default function TranslationKeyManager({
                   <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
                     Category
                   </th>
-                  {organizedLanguages.map((language, index) => {
+                  {organizedLanguages.map((language) => {
                     const isCurrentLanguage = currentLanguage?.code === language.code;
                     return (
                       <th

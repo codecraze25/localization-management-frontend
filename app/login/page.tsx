@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogIn, UserPlus, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/store/useAuthStore';
 
 export default function LoginPage() {

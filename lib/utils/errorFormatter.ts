@@ -117,23 +117,27 @@ export const getErrorType = (error: string): 'error' | 'warning' | 'info' => {
  * Extract error details for development/debugging
  */
 export const extractErrorDetails = (
-  error: any
+  error: unknown
 ): {
   message: string;
   code?: string;
   status?: number;
-  details?: any;
+  details?: unknown;
 } => {
   if (typeof error === 'string') {
     return { message: error };
   }
 
   if (error && typeof error === 'object') {
+    const errorObj = error as Record<string, unknown>;
     return {
-      message: error.message || error.detail || 'Unknown error',
-      code: error.code,
-      status: error.status,
-      details: error.details || error,
+      message:
+        (errorObj.message as string) ||
+        (errorObj.detail as string) ||
+        'Unknown error',
+      code: errorObj.code as string | undefined,
+      status: errorObj.status as number | undefined,
+      details: errorObj.details || error,
     };
   }
 
