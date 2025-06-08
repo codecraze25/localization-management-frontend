@@ -135,6 +135,17 @@ class ApiClient {
     });
   }
 
+  async deleteTranslationKey(
+    keyId: string
+  ): Promise<{ success: boolean; message: string; key_id: string }> {
+    return this.request<{ success: boolean; message: string; key_id: string }>(
+      `/translation-keys/${keyId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  }
+
   async updateTranslation(
     keyId: string,
     languageCode: string,

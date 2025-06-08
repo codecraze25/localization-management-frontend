@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Plus, Edit3, Save, X, AlertCircle } from 'lucide-react';
+import { Search, Filter, Plus, Edit3, Save, X, AlertCircle, Trash2 } from 'lucide-react';
 import { useTranslationKeys, useUpdateTranslation } from '@/hooks/useApi';
 import {
   useCurrentProject,
@@ -13,6 +13,7 @@ import {
 import { formatErrorMessage } from '@/lib/utils/errorFormatter';
 import type { TranslationKey, TranslationKeyFilters, Language } from '@/types';
 import AddTranslationKeyModal from './AddTranslationKeyModal';
+import DeleteTranslationKeyModal from './DeleteTranslationKeyModal';
 
 interface TranslationKeyManagerProps {
   projectId?: string;
@@ -34,6 +35,8 @@ export default function TranslationKeyManager({
   // Local state for search input and modals
   const [searchInput, setSearchInput] = useState(filters.search || '');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [keyToDelete, setKeyToDelete] = useState<TranslationKey | null>(null);
   const [editingCell, setEditingCell] = useState<{
     keyId: string;
     languageCode: string;
@@ -131,6 +134,16 @@ export default function TranslationKeyManager({
 
   const handleFilterChange = (filterUpdate: Partial<TranslationKeyFilters>) => {
     setFilters(filterUpdate);
+  };
+
+  const handleDeleteClick = (translationKey: TranslationKey) => {
+    setKeyToDelete(translationKey);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteModalClose = () => {
+    setIsDeleteModalOpen(false);
+    setKeyToDelete(null);
   };
 
   // Helper function to check if a translation is missing for the current language
@@ -277,6 +290,9 @@ export default function TranslationKeyManager({
                   <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
                     Category
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-300 uppercase tracking-wider">
+                    Actions
+                  </th>
                   {organizedLanguages.map((language, index) => {
                     const isCurrentLanguage = currentLanguage?.code === language.code;
                     return (
@@ -331,6 +347,15 @@ export default function TranslationKeyManager({
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-800 dark:bg-stone-600 dark:text-stone-200">
                           {translationKey.category}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleDeleteClick(translationKey)}
+                          className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title={`Delete ${translationKey.key}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                       {organizedLanguages.map((language) => {
                         const translation = translationKey.translations[language.code];
@@ -435,6 +460,13 @@ export default function TranslationKeyManager({
       <AddTranslationKeyModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+      />
+
+      {/* Delete Translation Key Modal */}
+      <DeleteTranslationKeyModal
+        isOpen={isDeleteModalOpen}
+        onClose={handleDeleteModalClose}
+        translationKey={keyToDelete}
       />
     </div>
   );

@@ -85,6 +85,27 @@ export const useCreateTranslationKey = () => {
   });
 };
 
+export const useDeleteTranslationKey = () => {
+  const queryClient = useQueryClient();
+  const { removeTranslationKey, setError } = useLocalizationActions();
+
+  return useMutation({
+    mutationFn: (keyId: string) => apiClient.deleteTranslationKey(keyId),
+    onSuccess: (result, keyId) => {
+      // Invalidate all translation keys queries to ensure the deleted key is removed
+      queryClient.invalidateQueries({
+        queryKey: ['translation-keys'],
+      });
+
+      // Remove from local store
+      removeTranslationKey(keyId);
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+};
+
 export const useUpdateTranslation = () => {
   const queryClient = useQueryClient();
   const { updateTranslation, setError } = useLocalizationActions();
