@@ -3,7 +3,6 @@ import type {
   CreateTranslationKeyRequest,
   UpdateTranslationRequest,
   ApiResponse,
-  ApiError as ApiErrorType,
 } from './types';
 import type {
   TranslationKey,
@@ -15,6 +14,30 @@ import type {
 
 // API base configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Custom API Error class
+class ApiError extends Error {
+  code: string;
+  status: number;
+  details?: Record<string, any>;
+  constructor({
+    message,
+    code,
+    status,
+    details,
+  }: {
+    message: string;
+    code: string;
+    status: number;
+    details?: Record<string, any>;
+  }) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+    this.details = details;
+  }
+}
 
 class ApiClient {
   private baseURL: string;
@@ -164,29 +187,4 @@ class ApiClient {
 export const apiClient = new ApiClient();
 
 // Export class for testing
-export { ApiClient };
-
-// Custom API Error class
-class ApiError extends Error {
-  code: string;
-  status: number;
-  details?: Record<string, any>;
-
-  constructor({
-    message,
-    code,
-    status,
-    details,
-  }: {
-    message: string;
-    code: string;
-    status: number;
-    details?: Record<string, any>;
-  }) {
-    super(message);
-    this.name = 'ApiError';
-    this.code = code;
-    this.status = status;
-    this.details = details;
-  }
-}
+export { ApiClient, ApiError };

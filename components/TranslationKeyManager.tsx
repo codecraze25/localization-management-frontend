@@ -7,8 +7,10 @@ import {
   useCurrentProject,
   useCurrentLanguage,
   useFilters,
+  useError,
   useLocalizationActions
 } from '@/store/useLocalizationStore';
+import { formatErrorMessage } from '@/lib/utils/errorFormatter';
 import type { TranslationKey, TranslationKeyFilters, Language } from '@/types';
 import AddTranslationKeyModal from './AddTranslationKeyModal';
 
@@ -24,7 +26,8 @@ export default function TranslationKeyManager({
   const currentProject = useCurrentProject();
   const currentLanguage = useCurrentLanguage();
   const filters = useFilters();
-  const { setFilters } = useLocalizationActions();
+  const globalError = useError();
+  const { setFilters, setError } = useLocalizationActions();
 
   const activeProjectId = projectId || currentProject?.id;
 
@@ -153,7 +156,7 @@ export default function TranslationKeyManager({
       <div className="flex items-center justify-center h-64 text-red-500">
         <div className="text-center">
           <h3 className="text-lg font-medium mb-2">Error Loading Translations</h3>
-          <p>{error.message}</p>
+          <p>{formatErrorMessage(error.message)}</p>
         </div>
       </div>
     );
@@ -186,6 +189,29 @@ export default function TranslationKeyManager({
           Add Key
         </button>
       </div>
+
+      {/* Global Error Banner */}
+      {globalError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                Error
+              </h4>
+              <p className="text-sm text-red-700 dark:text-red-300">
+                {formatErrorMessage(globalError)}
+              </p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div className="bg-white dark:bg-stone-800 rounded-lg p-4 shadow-sm border border-stone-200 dark:border-stone-700">

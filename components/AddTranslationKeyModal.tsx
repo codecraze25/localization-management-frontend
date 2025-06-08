@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Save, AlertCircle } from 'lucide-react';
 import { useCreateTranslationKey } from '@/hooks/useApi';
-import { useCurrentProject } from '@/store/useLocalizationStore';
+import { useCurrentProject, useError, useLocalizationActions } from '@/store/useLocalizationStore';
+import { formatErrorMessage } from '@/lib/utils/errorFormatter';
 import type { CreateTranslationKeyRequest } from '@/lib/api/types';
 
 interface AddTranslationKeyModalProps {
@@ -14,6 +15,8 @@ interface AddTranslationKeyModalProps {
 export default function AddTranslationKeyModal({ isOpen, onClose }: AddTranslationKeyModalProps) {
   const currentProject = useCurrentProject();
   const createMutation = useCreateTranslationKey();
+  const globalError = useError();
+  const { setError } = useLocalizationActions();
 
   const [formData, setFormData] = useState({
     key: '',
@@ -24,12 +27,22 @@ export default function AddTranslationKeyModal({ isOpen, onClose }: AddTranslati
 
   const availableLanguages = currentProject?.languages || [];
 
+  // Clear global error when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+    }
+  }, [isOpen, setError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!currentProject || !formData.key.trim() || !formData.category.trim()) {
       return;
     }
+
+    // Clear any previous errors
+    setError(null);
 
     try {
       const createData: CreateTranslationKeyRequest = {
@@ -51,6 +64,7 @@ export default function AddTranslationKeyModal({ isOpen, onClose }: AddTranslati
       });
       onClose();
     } catch (error) {
+      // Error is already handled by the mutation's onError callback
       console.error('Failed to create translation key:', error);
     }
   };
@@ -72,6 +86,7 @@ export default function AddTranslationKeyModal({ isOpen, onClose }: AddTranslati
       description: '',
       initialTranslations: {}
     });
+    setError(null); // Clear errors when closing
     onClose();
   };
 
@@ -97,6 +112,29 @@ export default function AddTranslationKeyModal({ isOpen, onClose }: AddTranslati
               <X size={20} />
             </button>
           </div>
+
+          {/* Error Alert */}
+          {globalError && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                    Error
+                  </h4>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {formatErrorMessage(globalError)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
