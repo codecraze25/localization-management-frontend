@@ -31,7 +31,7 @@ export default function LoginPage() {
   // Show loading while initializing
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-stone-50 dark:bg-stone-900 flex items-center justify-center">
+      <div className="h-full bg-stone-50 dark:bg-stone-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-stone-600 dark:text-stone-400">Loading...</p>
@@ -43,7 +43,7 @@ export default function LoginPage() {
   // If authenticated, show loading until redirect
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen bg-stone-50 dark:bg-stone-900 flex items-center justify-center">
+      <div className="h-full bg-stone-50 dark:bg-stone-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-stone-600 dark:text-stone-400">Redirecting...</p>
@@ -109,9 +109,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-900">
+    <div className="h-full bg-stone-50 dark:bg-stone-900 flex flex-col">
       {/* Header */}
-      <div className="bg-white dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700 px-4 py-3">
+      <div className="bg-white dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
@@ -122,7 +122,7 @@ export default function LoginPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12">
+      <div className="flex-1 flex items-center justify-center px-4 py-12 overflow-y-auto">
         <div className="w-full max-w-md">
           {/* Login Card */}
           <div className="bg-white dark:bg-stone-800 rounded-lg shadow-xl border border-stone-200 dark:border-stone-700 p-8">
