@@ -125,29 +125,40 @@ export const useLocalizationStore = create<LocalizationStore>()(
         languageCode: string,
         value: string
       ) => {
-        set(
-          (state) => ({
-            ...state,
-            translationKeys: state.translationKeys.map((key) => {
-              if (key.id === keyId) {
-                return {
-                  ...key,
-                  translations: {
-                    ...key.translations,
-                    [languageCode]: {
-                      value,
-                      updatedAt: new Date().toISOString(),
-                      updatedBy: 'user', // This should come from auth context
-                    },
-                  },
-                };
+        set((state) => ({
+          translationKeys: state.translationKeys.map((key) => {
+            if (key.id === keyId) {
+              // Get current user from auth store
+              const authStorage =
+                typeof window !== 'undefined'
+                  ? localStorage.getItem('auth-storage')
+                  : null;
+              let currentUser = 'user'; // fallback
+
+              if (authStorage) {
+                try {
+                  const parsed = JSON.parse(authStorage);
+                  currentUser = parsed.state?.user?.username || 'user';
+                } catch (error) {
+                  console.error('Error parsing auth storage:', error);
+                }
               }
-              return key;
-            }),
+
+              return {
+                ...key,
+                translations: {
+                  ...key.translations,
+                  [languageCode]: {
+                    value,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: currentUser,
+                  },
+                },
+              };
+            }
+            return key;
           }),
-          false,
-          'updateTranslation'
-        );
+        }));
       },
 
       addTranslationKey: (key: TranslationKey) => {

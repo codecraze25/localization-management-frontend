@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, Plus, Edit3, Save, X, AlertCircle, Trash2 } from 'lucide-react';
-import { useTranslationKeys, useUpdateTranslation } from '@/hooks/useApi';
+import { useTranslationKeys, useUpdateTranslation, useErrorHandler } from '@/hooks/useApi';
 import {
   useCurrentProject,
   useCurrentLanguage,
@@ -29,6 +29,7 @@ export default function TranslationKeyManager({
   const filters = useFilters();
   const globalError = useError();
   const { setFilters, setError } = useLocalizationActions();
+  const handleError = useErrorHandler();
 
   const activeProjectId = projectId || currentProject?.id;
 
@@ -56,6 +57,13 @@ export default function TranslationKeyManager({
       : filters.languageCode,
     missingTranslations: filters.missingTranslations,
   });
+
+  // Handle query errors
+  useEffect(() => {
+    if (error) {
+      handleError(error, 'Failed to load translation keys');
+    }
+  }, [error, handleError]);
 
   // Separate query for getting all categories (unfiltered)
   const {
@@ -406,26 +414,51 @@ export default function TranslationKeyManager({
                               </div>
                             ) : (
                               <div
-                                className="group flex items-center gap-2 cursor-pointer"
+                                className="group cursor-pointer"
                                 onClick={() => handleEditStart(
                                   translationKey.id,
                                   language.code,
                                   translation?.value || ''
                                 )}
                               >
-                                {translation && translation.value ? (
-                                  <span className="text-sm text-stone-900 dark:text-stone-100 flex-1">
-                                    {translation.value}
-                                  </span>
-                                ) : (
-                                  <span className={`text-sm italic flex-1 ${isCurrentLanguage && isMissing
-                                    ? 'text-red-500 font-medium'
-                                    : 'text-stone-400'
-                                    }`}>
-                                    Missing translation
-                                  </span>
-                                )}
-                                <Edit3 size={14} className="opacity-0 group-hover:opacity-100 text-stone-400" />
+                                <div className="flex items-center gap-2">
+                                  {translation && translation.value ? (
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm text-stone-900 dark:text-stone-100 break-words">
+                                        {translation.value}
+                                      </div>
+                                      {/* Translation metadata */}
+                                      <div className="mt-1 text-xs text-stone-500 dark:text-stone-400 space-y-0.5">
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">By:</span>
+                                          <span className="bg-stone-100 dark:bg-stone-700 px-1.5 py-0.5 rounded text-xs">
+                                            {translation.updatedBy}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">At:</span>
+                                          <span>
+                                            {new Date(translation.updatedAt).toLocaleString('en-US', {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            })}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className={`text-sm italic flex-1 ${isCurrentLanguage && isMissing
+                                      ? 'text-red-500 font-medium'
+                                      : 'text-stone-400'
+                                      }`}>
+                                      Missing translation
+                                    </span>
+                                  )}
+                                  <Edit3 size={14} className="opacity-0 group-hover:opacity-100 text-stone-400" />
+                                </div>
                               </div>
                             )}
                           </td>

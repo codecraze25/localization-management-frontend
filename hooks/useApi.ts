@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import type { BulkUpdateRequest } from '@/types';
 import type {
   GetTranslationKeysParams,
   CreateTranslationKeyRequest,
 } from '@/lib/api/types';
 import { useLocalizationActions } from '@/store/useLocalizationStore';
+import { useAuth } from '@/store/useAuthStore';
+import { useRouter } from 'next/navigation';
 
 // Query Keys
 export const queryKeys = {
@@ -18,6 +20,30 @@ export const queryKeys = {
   analytics: (projectId: string) => ['analytics', projectId] as const,
   localizations: (projectId: string, locale: string) =>
     ['localizations', projectId, locale] as const,
+};
+
+// Enhanced error handler hook
+export const useErrorHandler = () => {
+  const { logout } = useAuth();
+  const router = useRouter();
+  const { setError } = useLocalizationActions();
+
+  return (error: unknown, defaultMessage: string = 'An error occurred') => {
+    console.error('API Error:', error);
+
+    if (error instanceof ApiError) {
+      if (error.isAuthError) {
+        // Handle authentication errors
+        logout();
+        router.push('/login');
+        setError('Your session has expired. Please login again.');
+        return;
+      }
+      setError(error.message);
+    } else {
+      setError(defaultMessage);
+    }
+  };
 };
 
 // Projects
@@ -34,8 +60,6 @@ export const useTranslationKeys = (
   projectId: string,
   params?: Partial<GetTranslationKeysParams>
 ) => {
-  const { setError } = useLocalizationActions();
-
   return useQuery({
     queryKey: queryKeys.translationKeys(projectId, params),
     queryFn: () =>
@@ -46,7 +70,6 @@ export const useTranslationKeys = (
         ...params,
       }),
     enabled: !!projectId,
-    // Use throwOnError or handle errors in component
     select: (data) => {
       // Optional: transform data here
       return data;
@@ -65,7 +88,8 @@ export const useTranslationKey = (keyId: string) => {
 // Mutations
 export const useCreateTranslationKey = () => {
   const queryClient = useQueryClient();
-  const { addTranslationKey, setError } = useLocalizationActions();
+  const { addTranslationKey } = useLocalizationActions();
+  const handleError = useErrorHandler();
 
   return useMutation({
     mutationFn: (data: CreateTranslationKeyRequest) =>
@@ -79,15 +103,15 @@ export const useCreateTranslationKey = () => {
       // Add to local store
       addTranslationKey(newKey);
     },
-    onError: (error: Error) => {
-      setError(error.message);
-    },
+    onError: (error: unknown) =>
+      handleError(error, 'Failed to create translation key'),
   });
 };
 
 export const useDeleteTranslationKey = () => {
   const queryClient = useQueryClient();
-  const { removeTranslationKey, setError } = useLocalizationActions();
+  const { removeTranslationKey } = useLocalizationActions();
+  const handleError = useErrorHandler();
 
   return useMutation({
     mutationFn: (keyId: string) => apiClient.deleteTranslationKey(keyId),
@@ -100,15 +124,16 @@ export const useDeleteTranslationKey = () => {
       // Remove from local store
       removeTranslationKey(keyId);
     },
-    onError: (error: Error) => {
-      setError(error.message);
-    },
+    onError: (error: unknown) =>
+      handleError(error, 'Failed to delete translation key'),
   });
 };
 
 export const useUpdateTranslation = () => {
   const queryClient = useQueryClient();
-  const { updateTranslation, setError } = useLocalizationActions();
+  const { updateTranslation } = useLocalizationActions();
+  const { user } = useAuth();
+  const handleError = useErrorHandler();
 
   return useMutation({
     mutationFn: ({
@@ -119,7 +144,18 @@ export const useUpdateTranslation = () => {
       keyId: string;
       languageCode: string;
       value: string;
-    }) => apiClient.updateTranslation(keyId, languageCode, { value }),
+    }) => {
+      // Validate authentication before making the request
+      if (!apiClient.isAuthenticated()) {
+        throw new ApiError({
+          message: 'You must be logged in to update translations',
+          code: 'NO_AUTH',
+          status: 401,
+        });
+      }
+
+      return apiClient.updateTranslation(keyId, languageCode, { value });
+    },
     onMutate: async (variables) => {
       // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
       await queryClient.cancelQueries({ queryKey: ['translation-keys'] });
@@ -146,7 +182,7 @@ export const useUpdateTranslation = () => {
                     [variables.languageCode]: {
                       value: variables.value,
                       updatedAt: new Date().toISOString(),
-                      updatedBy: 'user',
+                      updatedBy: user?.username || 'user',
                     },
                   },
                 };
@@ -176,7 +212,7 @@ export const useUpdateTranslation = () => {
         queryKey: queryKeys.translationKey(variables.keyId),
       });
     },
-    onError: (error: Error, variables, context) => {
+    onError: (error: unknown, variables, context) => {
       // Rollback optimistic updates on error
       if (context?.previousData) {
         context.previousData.forEach(([queryKey, data]) => {
@@ -184,18 +220,29 @@ export const useUpdateTranslation = () => {
         });
       }
 
-      setError(error.message);
+      handleError(error, 'Failed to update translation');
     },
   });
 };
 
 export const useBulkUpdateTranslations = () => {
   const queryClient = useQueryClient();
-  const { updateTranslation, setError } = useLocalizationActions();
+  const { updateTranslation } = useLocalizationActions();
+  const handleError = useErrorHandler();
 
   return useMutation({
-    mutationFn: (data: BulkUpdateRequest) =>
-      apiClient.bulkUpdateTranslations(data),
+    mutationFn: (data: BulkUpdateRequest) => {
+      // Validate authentication before making the request
+      if (!apiClient.isAuthenticated()) {
+        throw new ApiError({
+          message: 'You must be logged in to update translations',
+          code: 'NO_AUTH',
+          status: 401,
+        });
+      }
+
+      return apiClient.bulkUpdateTranslations(data);
+    },
     onSuccess: (result, variables) => {
       // Invalidate all translation key queries
       queryClient.invalidateQueries({
@@ -207,9 +254,8 @@ export const useBulkUpdateTranslations = () => {
         updateTranslation(update.keyId, update.languageCode, update.value);
       });
     },
-    onError: (error: Error) => {
-      setError(error.message);
-    },
+    onError: (error: unknown) =>
+      handleError(error, 'Failed to bulk update translations'),
   });
 };
 

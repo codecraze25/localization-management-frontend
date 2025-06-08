@@ -1,5 +1,41 @@
 // Core data interfaces for the localization management system
 
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  full_name: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
 export interface Translation {
   value: string;
   updatedAt: string;

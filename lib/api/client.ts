@@ -10,16 +10,105 @@ import type {
   GetTranslationKeysResponse,
   AnalyticsResponse,
   BulkUpdateRequest,
+  User,
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  Translation,
 } from '@/types';
 
 // API base configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Custom API Error class
+// Enhanced auth token management
+class AuthTokenManager {
+  private static instance: AuthTokenManager;
+
+  static getInstance(): AuthTokenManager {
+    if (!AuthTokenManager.instance) {
+      AuthTokenManager.instance = new AuthTokenManager();
+    }
+    return AuthTokenManager.instance;
+  }
+
+  getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const parsed = JSON.parse(authStorage);
+        const token = parsed.state?.token;
+
+        // Log token status for debugging
+        if (!token) {
+          console.warn('No auth token found in storage');
+        }
+
+        return token || null;
+      }
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+    }
+    return null;
+  }
+
+  clearToken(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('auth-storage');
+      } catch (error) {
+        console.error('Error clearing auth token:', error);
+      }
+    }
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+}
+
+// Data transformation utilities
+const transformTranslation = (apiTranslation: any): Translation => ({
+  value: apiTranslation.value || '',
+  updatedAt: apiTranslation.updated_at || new Date().toISOString(),
+  updatedBy: apiTranslation.updated_by || 'unknown',
+});
+
+const transformTranslationKey = (apiKey: any): TranslationKey => {
+  const translations: { [languageCode: string]: Translation } = {};
+
+  if (apiKey.translations) {
+    for (const [langCode, trans] of Object.entries(apiKey.translations)) {
+      translations[langCode] = transformTranslation(trans);
+    }
+  }
+
+  return {
+    id: apiKey.id,
+    key: apiKey.key,
+    category: apiKey.category,
+    description: apiKey.description,
+    translations,
+  };
+};
+
+const transformGetTranslationKeysResponse = (
+  apiResponse: any
+): GetTranslationKeysResponse => ({
+  keys: apiResponse.keys.map(transformTranslationKey),
+  total: apiResponse.total,
+  page: apiResponse.page,
+  limit: apiResponse.limit,
+});
+
+// Enhanced API Error class
 class ApiError extends Error {
   code: string;
   status: number;
   details?: Record<string, any>;
+  isAuthError: boolean;
+
   constructor({
     message,
     code,
@@ -36,19 +125,23 @@ class ApiError extends Error {
     this.code = code;
     this.status = status;
     this.details = details;
+    this.isAuthError = status === 401 || status === 403;
   }
 }
 
 class ApiClient {
   private baseURL: string;
+  private authManager: AuthTokenManager;
 
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
+    this.authManager = AuthTokenManager.getInstance();
   }
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    requireAuth: boolean = false
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
 
@@ -60,11 +153,38 @@ class ApiClient {
       ...options,
     };
 
+    // Add authentication header if token exists or is required
+    const token = this.authManager.getToken();
+    if (token) {
+      config.headers = {
+        ...config.headers,
+        Authorization: `Bearer ${token}`,
+      };
+    } else if (requireAuth) {
+      throw new ApiError({
+        message: 'Authentication token not found. Please login again.',
+        code: 'NO_AUTH_TOKEN',
+        status: 401,
+      });
+    }
+
     try {
       const response = await fetch(url, config);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        // Handle auth errors specifically
+        if (response.status === 401) {
+          this.authManager.clearToken();
+          throw new ApiError({
+            message: 'Authentication required. Please login again.',
+            code: 'AUTH_REQUIRED',
+            status: 401,
+            details: errorData,
+          });
+        }
+
         throw new ApiError({
           message:
             errorData.detail ||
@@ -119,20 +239,27 @@ class ApiClient {
       query ? `?${query}` : ''
     }`;
 
-    return this.request<GetTranslationKeysResponse>(endpoint);
+    const apiResponse = await this.request<any>(endpoint);
+    return transformGetTranslationKeysResponse(apiResponse);
   }
 
   async getTranslationKey(keyId: string): Promise<TranslationKey> {
-    return this.request<TranslationKey>(`/translation-keys/${keyId}`);
+    const apiResponse = await this.request<any>(`/translation-keys/${keyId}`);
+    return transformTranslationKey(apiResponse);
   }
 
   async createTranslationKey(
     data: CreateTranslationKeyRequest
   ): Promise<TranslationKey> {
-    return this.request<TranslationKey>('/translation-keys', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const apiResponse = await this.request<any>(
+      '/translation-keys',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+      true
+    ); // Require auth
+    return transformTranslationKey(apiResponse);
   }
 
   async deleteTranslationKey(
@@ -142,7 +269,8 @@ class ApiClient {
       `/translation-keys/${keyId}`,
       {
         method: 'DELETE',
-      }
+      },
+      true // Require auth
     );
   }
 
@@ -160,7 +288,8 @@ class ApiClient {
           language_code: languageCode,
           value: data.value,
         }),
-      }
+      },
+      true // Require auth
     );
   }
 
@@ -170,10 +299,14 @@ class ApiClient {
     updated_count: number;
     total_requested: number;
   }> {
-    return this.request('/translations/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.request(
+      '/translations/bulk-update',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+      true
+    ); // Require auth
   }
 
   // Analytics API
@@ -192,10 +325,52 @@ class ApiClient {
   }> {
     return this.request(`/localizations/${projectId}/${locale}`);
   }
+
+  // Authentication API
+  async login(credentials: LoginRequest): Promise<LoginResponse> {
+    return this.request<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  }
+
+  async register(userData: RegisterRequest): Promise<User> {
+    return this.request<User>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async logout(): Promise<{ success: boolean; message: string }> {
+    const result = await this.request<{ success: boolean; message: string }>(
+      '/auth/logout',
+      {
+        method: 'POST',
+      },
+      true
+    ); // Require auth
+
+    // Clear token after successful logout
+    this.authManager.clearToken();
+    return result;
+  }
+
+  async getCurrentUser(): Promise<User> {
+    return this.request<User>('/auth/me', {}, true); // Require auth
+  }
+
+  // Utility methods
+  isAuthenticated(): boolean {
+    return this.authManager.isAuthenticated();
+  }
+
+  clearAuthToken(): void {
+    this.authManager.clearToken();
+  }
 }
 
 // Export singleton instance
 export const apiClient = new ApiClient();
 
-// Export class for testing
-export { ApiClient, ApiError };
+// Export classes for testing
+export { ApiClient, ApiError, AuthTokenManager };
