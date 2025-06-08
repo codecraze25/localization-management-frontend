@@ -10,6 +10,7 @@ import {
   useLocalizationActions
 } from '@/store/useLocalizationStore';
 import type { TranslationKey, TranslationKeyFilters, Language } from '@/types';
+import AddTranslationKeyModal from './AddTranslationKeyModal';
 
 interface TranslationKeyManagerProps {
   projectId?: string;
@@ -27,8 +28,9 @@ export default function TranslationKeyManager({
 
   const activeProjectId = projectId || currentProject?.id;
 
-  // Local state for search input
+  // Local state for search input and modals
   const [searchInput, setSearchInput] = useState(filters.search || '');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCell, setEditingCell] = useState<{
     keyId: string;
     languageCode: string;
@@ -173,39 +175,15 @@ export default function TranslationKeyManager({
             )}
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          disabled={!currentProject}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <Plus size={16} />
           Add Key
         </button>
       </div>
-
-      {/* Current Language Focus Banner */}
-      {currentLanguage && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{currentLanguage.flag}</span>
-                <div>
-                  <h3 className="font-medium text-blue-900 dark:text-blue-100">
-                    Focusing on {currentLanguage.name}
-                  </h3>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    The table is optimized for {currentLanguage.name} translations
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => handleFilterChange({ missingTranslations: true, languageCode: currentLanguage.code })}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              <AlertCircle size={14} />
-              Show Missing Only
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Search and Filters */}
       <div className="bg-white dark:bg-stone-800 rounded-lg p-4 shadow-sm border border-stone-200 dark:border-stone-700">
@@ -423,6 +401,12 @@ export default function TranslationKeyManager({
           </button>
         </div>
       )}
+
+      {/* Add Translation Key Modal */}
+      <AddTranslationKeyModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </div>
   );
 }

@@ -24,24 +24,6 @@ export default function HomePage() {
 
             {/* Language Selection */}
             <LanguageSelector />
-
-            {/* Stats or Quick Actions could go here */}
-            <div className="border-t border-stone-200 dark:border-stone-700 pt-6">
-              <h3 className="text-sm font-medium text-stone-700 dark:text-stone-300 mb-3">
-                Quick Actions
-              </h3>
-              <div className="space-y-2">
-                <button className="w-full text-left px-3 py-2 text-sm text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-700 rounded-lg transition-colors">
-                  Export Translations
-                </button>
-                <button className="w-full text-left px-3 py-2 text-sm text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-700 rounded-lg transition-colors">
-                  Import Translations
-                </button>
-                <button className="w-full text-left px-3 py-2 text-sm text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-700 rounded-lg transition-colors">
-                  View Analytics
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
