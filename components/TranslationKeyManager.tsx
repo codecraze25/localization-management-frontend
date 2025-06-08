@@ -45,7 +45,9 @@ export default function TranslationKeyManager({
   } = useTranslationKeys(activeProjectId || '', {
     search: filters.search,
     category: filters.category,
-    languageCode: filters.languageCode,
+    languageCode: filters.missingTranslations
+      ? (currentLanguage?.code || filters.languageCode)
+      : filters.languageCode,
     missingTranslations: filters.missingTranslations,
   });
 
@@ -222,6 +224,11 @@ export default function TranslationKeyManager({
             />
             <span className="text-sm text-stone-700 dark:text-stone-300">
               Missing only
+              {filters.missingTranslations && currentLanguage && (
+                <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">
+                  ({currentLanguage.flag} {currentLanguage.name})
+                </span>
+              )}
             </span>
           </label>
         </div>
